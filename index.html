@@ -2,165 +2,114 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Jit Jot Radio</title>
   <style>
     body {
+      margin: 0;
       background: black;
       color: white;
-      font-family: sans-serif;
+      font-family: monospace;
       text-align: center;
-      margin: 0;
-      padding: 0;
     }
-    h1 {
-      font-size: 2em;
-      margin: 1em 0;
-    }
-    #player {
+    iframe {
       display: none;
     }
+    #player {
+      margin-top: 2em;
+    }
     #history {
-      margin: 2em 0;
+      margin-top: 2em;
     }
     .thumbnail {
       width: 120px;
+      height: auto;
       margin: 5px;
-      display: inline-block;
-    }
-    .next {
-      margin-top: 2em;
-    }
-    .next img {
-      width: 160px;
-    }
-    #volumeControl {
-      margin-top: 20px;
     }
   </style>
 </head>
 <body>
   <h1>Jit Jot Radio</h1>
-  <div id="nowPlaying">Cargando...</div>
-  <div id="volumeControl">
-    Volumen:
-    <input type="range" min="0" max="100" value="50" id="volumeSlider" />
-  </div>
-
-  <div id="history">
-    <h2>Historial</h2>
-    <div id="historyContainer"></div>
-  </div>
-
-  <div class="next">
-    <h2>Siguiente:</h2>
-    <div id="nextContainer"></div>
-  </div>
-
-  <iframe
-    id="player"
-    type="text/html"
-    width="0"
-    height="0"
-    src=""
-    frameborder="0"
-    allow="autoplay"
-  ></iframe>
+  <div id="player">Cargando...</div>
+  <h2>Siguiente:</h2>
+  <div id="next"></div>
+  <h2>Historial</h2>
+  <div id="history"></div>
 
   <script>
-    const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS0uilsv3McF9pbIwdO_awWhgL3Kg7n09nbw5YlCM4oIaPXO6MhnS0p6KYrDxdEM_LnvktccPHctDmK/pub?gid=0&single=true&output=csv";
+    const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS0uilsv3McF9pbIwdO_awWhgL3Kg7n09nbw5YlCM4oIaPXO6MhnS0p6KYrDxdEM_LnvktccPHctDmK/pub?gid=0&single=true&output=csv';
+
     let playlist = [];
-    let currentIndex = 0;
+    let current = 0;
     let history = [];
 
-    function loadCSV(url, callback) {
-      fetch(url)
-        .then((response) => response.text())
-        .then((data) => {
-          const lines = data.split("\n").slice(1);
-          const result = lines.map((line) => {
-            const [title, youtubeId, startSeconds, endSeconds] = line.split(",");
-            return {
-              title: title.trim(),
-              id: youtubeId.trim(),
-              start: parseInt(startSeconds.trim()),
-              end: parseInt(endSeconds.trim()),
-            };
+    function loadPlaylist() {
+      fetch(sheetUrl)
+        .then(res => res.text())
+        .then(text => {
+          const lines = text.trim().split('\n').slice(1);
+          playlist = lines.map(line => {
+            const [title, videoId, start, end] = line.split(',');
+            return { title, videoId, start: +start, end: +end };
           });
-          callback(result.filter(item => item.id));
+          playNext();
         });
     }
 
-    function playTrack(index) {
-      if (index >= playlist.length) index = 0;
-      currentIndex = index;
-      const track = playlist[index];
+    function playNext() {
+      if (current >= playlist.length) current = 0;
+      const track = playlist[current];
 
-      const player = document.getElementById("player");
-      const src = `https://www.youtube.com/embed/${track.id}?start=${track.start}&end=${track.end}&autoplay=1&controls=0&modestbranding=1`;
-      player.src = src;
+      const start = track.start || 0;
+      const end = track.end || '';
+      const duration = end ? (end - start) * 1000 : 60000;
 
-      document.getElementById("nowPlaying").innerText = `▶️ ${track.title}`;
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://www.youtube.com/embed/${track.videoId}?start=${start}&autoplay=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&playsinline=1`;
+      iframe.width = '0';
+      iframe.height = '0';
+      iframe.allow = 'autoplay';
 
-      // Historial
-      if (history.length > 0 && history[0].id !== track.id) {
-        history.unshift(track);
-        if (history.length > 10) history.pop();
-        renderHistory();
-      }
+      const player = document.getElementById('player');
+      player.innerHTML = `<p>${track.title}</p>`;
+      player.appendChild(iframe);
 
-      // Siguiente
-      renderNext(index + 1);
+      updateHistory(track);
+      updateNext();
 
-      // Programar el siguiente tema
-      const duration = (track.end - track.start) * 1000;
-      setTimeout(() => playTrack(index + 1), duration);
+      setTimeout(() => {
+        current++;
+        playNext();
+      }, duration);
     }
 
-    function renderHistory() {
-      const container = document.getElementById("historyContainer");
-      container.innerHTML = "";
-      history.slice(1).forEach((track) => {
-        const div = document.createElement("div");
-        div.className = "thumbnail";
-        div.innerHTML = `
-          <a href="https://youtu.be/${track.id}" target="_blank">
-            <img src="https://img.youtube.com/vi/${track.id}/default.jpg" alt="${track.title}" />
-            <div style="font-size: 0.8em;">${track.title}</div>
-          </a>`;
-        container.appendChild(div);
-      });
-    }
+    function updateHistory(track) {
+      history.unshift(track);
+      if (history.length > 10) history = history.slice(0, 10);
 
-    function renderNext(index) {
-      if (index >= playlist.length) index = 0;
-      const nextTrack = playlist[index];
-      const container = document.getElementById("nextContainer");
-      container.innerHTML = `
+      const historyDiv = document.getElementById('history');
+      historyDiv.innerHTML = history.map(t => `
         <div>
-          <img src="https://img.youtube.com/vi/${nextTrack.id}/default.jpg" />
-          <div style="font-size: 1em;">${nextTrack.title}</div>
-        </div>`;
+          <a href="https://www.youtube.com/watch?v=${t.videoId}&t=${t.start}s" target="_blank">
+            <img src="https://img.youtube.com/vi/${t.videoId}/default.jpg" class="thumbnail" alt="${t.title}" /><br/>
+            ${t.title}
+          </a>
+        </div>
+      `).join('');
     }
 
-    // Volumen
-    document.getElementById("volumeSlider").addEventListener("input", (e) => {
-      const volume = e.target.value;
-      const iframe = document.getElementById("player");
-      iframe.contentWindow.postMessage(
-        JSON.stringify({
-          event: "command",
-          func: "setVolume",
-          args: [volume],
-        }),
-        "*"
-      );
-    });
+    function updateNext() {
+      const next = playlist[(current + 1) % playlist.length];
+      const nextDiv = document.getElementById('next');
+      nextDiv.innerHTML = `
+        <a href="https://www.youtube.com/watch?v=${next.videoId}&t=${next.start}s" target="_blank">
+          <img src="https://img.youtube.com/vi/${next.videoId}/default.jpg" class="thumbnail" alt="${next.title}" /><br/>
+          ${next.title}
+        </a>
+      `;
+    }
 
-    loadCSV(sheetURL, (data) => {
-      playlist = data;
-      playTrack(0);
-    });
+    loadPlaylist();
   </script>
 </body>
 </html>
