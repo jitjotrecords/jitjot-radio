@@ -1,138 +1,117 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Jit Jot Radio</title>
   <style>
-    body { font-family: sans-serif; background: #111; color: white; margin: 0; padding: 20px; }
-    iframe { border: none; width: 100%; height: 360px; }
-    .history, .next { margin-top: 20px; }
-    .track { display: flex; align-items: center; margin-bottom: 10px; }
-    .track img { width: 120px; height: 90px; margin-right: 10px; }
-    .volume { margin-top: 10px; }
+    body {
+      background: black;
+      color: white;
+      font-family: 'Courier New', monospace;
+      text-align: center;
+      padding: 2rem;
+    }
+    #player {
+      margin-top: 1rem;
+    }
+    #history {
+      margin-top: 2rem;
+      text-align: left;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .track-item {
+      border-bottom: 1px solid #555;
+      padding: 0.5rem 0;
+    }
+    .tags {
+      font-size: 0.8rem;
+      color: #aaa;
+    }
   </style>
 </head>
 <body>
   <h1>Jit Jot Radio</h1>
-  <div id="player-container"></div>
-  <div class="volume">
-    Volumen: <input type="range" id="volume" min="0" max="100" value="50" />
-  </div>
-  <div class="next">
-    <h2>Siguiente</h2>
-    <div id="next-track"></div>
-  </div>
-  <div class="history">
-    <h2>Últimos 10 temas</h2>
-    <div id="history"></div>
+  <div id="player"></div>
+  <p id="title">Cargando...</p>
+
+  <div id="history">
+    <h2>Historial</h2>
+    <div id="history-list"></div>
   </div>
 
+  <script src="https://www.youtube.com/iframe_api"></script>
   <script>
-    const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS0uilsv3McF9pbIwdO_awWhgL3Kg7n09nbw5YlCM4oIaPXO6MhnS0p6KYrDxdEM_LnvktccPHctDmK/pub?gid=0&single=true&output=csv";
+    const sheetId = 'TU_GOOGLE_SHEET_ID'; // Reemplazá con el ID real
+    const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+
     let playlist = [];
-    const historyList = [];
+    let currentVideo = null;
+    let player;
 
-    const volumeSlider = document.getElementById('volume');
-
-    function fetchCSV(url) {
-      return fetch(url)
-        .then(response => response.text())
+    function fetchPlaylist() {
+      fetch(sheetUrl)
+        .then(res => res.text())
         .then(text => {
-          const rows = text.split('\n').slice(1); // Remove header
-          return rows.map(row => {
-            const cols = row.split(',');
-            return {
-              id: cols[0].trim(),
-              start: parseInt(cols[1]?.trim() || '0'),
-              end: parseInt(cols[2]?.trim() || '0'),
-              title: cols[3]?.trim() || 'Sin título'
-            };
-          }).filter(track => track.id);
+          const json = JSON.parse(text.substring(47).slice(0, -2));
+          const rows = json.table.rows;
+          playlist = rows.map(r => ({
+            id: r.c[0].v,
+            title: r.c[1].v,
+            tags: r.c[2].v
+          }));
+          playNext();
         });
     }
 
-    function getCurrentUTCSeconds() {
-      const now = new Date();
-      const utcNow = new Date(now.toUTCString().substr(0, 25));
-      return (
-        utcNow.getUTCHours() * 3600 +
-        utcNow.getUTCMinutes() * 60 +
-        utcNow.getUTCSeconds()
-      );
-    }
-
-    function findCurrentTrack(seconds) {
-      let acc = 0;
-      for (let i = 0; i < playlist.length; i++) {
-        const track = playlist[i];
-        const duration = track.end - track.start;
-        if (seconds < acc + duration) {
-          return { index: i, offset: seconds - acc };
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        height: '360',
+        width: '640',
+        videoId: '',
+        events: {
+          'onReady': playNext,
+          'onStateChange': onPlayerStateChange
         }
-        acc += duration;
-      }
-      // Loop
-      return findCurrentTrack(seconds % acc);
-    }
-
-    function playSyncedTrack() {
-      const nowSeconds = getCurrentUTCSeconds();
-      const { index, offset } = findCurrentTrack(nowSeconds);
-      const track = playlist[index];
-      const videoStart = track.start + offset;
-      const videoEnd = track.end;
-
-      const playerContainer = document.getElementById('player-container');
-      const embedURL = `https://www.youtube.com/embed/${track.id}?start=${videoStart}&end=${videoEnd}&autoplay=1&mute=0&controls=0&rel=0&modestbranding=1`;
-
-      playerContainer.innerHTML = `<iframe src="${embedURL}" allow="autoplay"></iframe>`;
-
-      // Historial
-      if (!historyList.length || historyList[0].id !== track.id) {
-        historyList.unshift(track);
-        if (historyList.length > 10) historyList.pop();
-        updateHistory();
-      }
-
-      // Siguiente
-      const nextTrack = playlist[(index + 1) % playlist.length];
-      document.getElementById('next-track').innerHTML = `
-        <div class="track">
-          <img src="https://img.youtube.com/vi/${nextTrack.id}/default.jpg" />
-          <span>${nextTrack.title}</span>
-        </div>
-      `;
-
-      // Recalcular cuando termine
-      const remaining = (track.end - videoStart) * 1000;
-      setTimeout(playSyncedTrack, remaining);
-    }
-
-    function updateHistory() {
-      const historyEl = document.getElementById('history');
-      historyEl.innerHTML = '';
-      historyList.forEach(t => {
-        const el = document.createElement('div');
-        el.className = 'track';
-        el.innerHTML = `
-          <img src="https://img.youtube.com/vi/${t.id}/default.jpg" />
-          <a href="https://youtu.be/${t.id}?t=${t.start}" target="_blank">${t.title}</a>
-        `;
-        historyEl.appendChild(el);
       });
     }
 
-    fetchCSV(SHEET_CSV_URL).then(data => {
-      playlist = data;
-      playSyncedTrack();
-    });
+    function playNext() {
+      if (playlist.length === 0) return;
+      const next = playlist[Math.floor(Math.random() * playlist.length)];
+      currentVideo = next;
+      player.loadVideoById(next.id);
+      document.getElementById("title").innerText = next.title;
+      addToHistory(next);
+    }
 
-    volumeSlider.addEventListener('input', () => {
-      const iframe = document.querySelector('iframe');
-      const volume = volumeSlider.value / 100;
-      iframe.contentWindow.postMessage({ event: 'setVolume', volume }, '*');
-    });
+    function onPlayerStateChange(event) {
+      if (event.data === YT.PlayerState.ENDED) {
+        playNext();
+      }
+    }
+
+    function addToHistory(video) {
+      let history = JSON.parse(localStorage.getItem('jitjot_history') || '[]');
+      history.unshift(video);
+      history = history.slice(0, 10); // Solo los últimos 10
+      localStorage.setItem('jitjot_history', JSON.stringify(history));
+      renderHistory();
+    }
+
+    function renderHistory() {
+      let history = JSON.parse(localStorage.getItem('jitjot_history') || '[]');
+      const container = document.getElementById("history-list");
+      container.innerHTML = '';
+      history.forEach(video => {
+        const div = document.createElement('div');
+        div.className = 'track-item';
+        div.innerHTML = `<strong>${video.title}</strong><div class='tags'>${video.tags}</div>`;
+        container.appendChild(div);
+      });
+    }
+
+    fetchPlaylist();
   </script>
 </body>
 </html>
