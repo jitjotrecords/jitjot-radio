@@ -5,37 +5,15 @@
   <title>Jitjot Radio</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: black;
       color: white;
       font-family: sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 0;
-    }
-
-    #start-screen {
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      height: 100vh;
-      background: black;
-    }
-
-    #start-button {
-      font-size: 1.5em;
-      padding: 1em 2em;
-      background: white;
-      color: black;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-    }
-
-    #main {
-      display: none;
-      padding: 2rem;
+      padding: 1rem;
     }
 
     h1 {
@@ -43,153 +21,131 @@
       margin-bottom: 1rem;
     }
 
-    .now-playing {
-      margin-top: 1.5rem;
-      font-size: 1.2em;
-    }
-
-    .tags, .duration {
-      color: #aaa;
-      font-size: 0.9em;
-    }
-
     #cover {
-      max-width: 80%;
-      max-height: 400px;
-      border-radius: 12px;
-      margin-top: 1rem;
-      box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+      width: 90vmin;
+      max-width: 400px;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      border-radius: 10px;
+      box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
+      margin-bottom: 1rem;
+    }
+
+    #title {
+      font-size: 1.2rem;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .thumb-strip {
+      display: flex;
+      overflow-x: auto;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+      max-width: 100vw;
+    }
+
+    .thumb {
+      flex: 0 0 auto;
+      width: 60px;
+      height: 60px;
+      object-fit: cover;
+      border-radius: 6px;
+      opacity: 0.6;
+    }
+
+    .thumb.current {
+      border: 2px solid white;
+      opacity: 1;
     }
 
     #player {
-      width: 0;
-      height: 0;
-      overflow: hidden;
-      opacity: 0;
-      pointer-events: none;
-      position: absolute;
+      display: none;
     }
   </style>
 </head>
 <body>
+  <h1>JITJOT RADIO</h1>
+  <img id="cover" src="" alt="Tapa" />
+  <div id="title">Cargando...</div>
 
-  <div id="start-screen">
-    <h2>🎧 Bienvenido a Jit Jot Radio</h2>
-    <button id="start-button">Iniciar radio</button>
-  </div>
+  <div class="thumb-strip" id="played"></div>
+  <div class="thumb-strip" id="upcoming"></div>
 
-  <div id="main">
-    <h1>JIT JOT RADIO</h1>
-    <img id="cover" src="" alt="Tapa del tema" />
-    <div id="player"></div>
-
-    <div class="now-playing">
-      <div id="track-title">Cargando...</div>
-      <div id="track-tags" class="tags"></div>
-      <div id="track-duration" class="duration"></div>
-    </div>
-  </div>
+  <div id="player"></div>
 
   <script src="https://www.youtube.com/iframe_api"></script>
-
   <script>
     const sheetURL = "https://docs.google.com/spreadsheets/d/1WpCq0LQduIwF5h1sucDr239JbcPbqoqQttXw8_VMHpY/gviz/tq?tqx=out:json";
-    let videoList = [];
-    let currentIndex = 0;
-    let player;
+    let playlist = [], currentIndex = 0, player;
 
-    document.getElementById("start-button").addEventListener("click", () => {
-      document.getElementById("start-screen").style.display = "none";
-      document.getElementById("main").style.display = "block";
-      startRadio();
-    });
+    function formatRow(row) {
+      return {
+        videoId: row.c[0]?.v,
+        title: row.c[1]?.v || '',
+      };
+    }
 
-    function startRadio() {
-      if (typeof YT === "undefined" || typeof YT.Player === "undefined") {
-        window.onYouTubeIframeAPIReady = createPlayer;
-      } else {
-        createPlayer();
+    function updateUI() {
+      const current = playlist[currentIndex];
+      document.getElementById('title').textContent = current.title;
+      document.getElementById('cover').src = `https://i.ytimg.com/vi/${current.videoId}/hqdefault.jpg`;
+
+      const played = document.getElementById('played');
+      const upcoming = document.getElementById('upcoming');
+      played.innerHTML = '';
+      upcoming.innerHTML = '';
+
+      for (let i = 0; i < currentIndex; i++) {
+        const thumb = document.createElement('img');
+        thumb.src = `https://i.ytimg.com/vi/${playlist[i].videoId}/default.jpg`;
+        thumb.className = 'thumb';
+        played.appendChild(thumb);
+      }
+
+      for (let i = currentIndex + 1; i < Math.min(playlist.length, currentIndex + 10); i++) {
+        const thumb = document.createElement('img');
+        thumb.src = `https://i.ytimg.com/vi/${playlist[i].videoId}/default.jpg`;
+        thumb.className = 'thumb';
+        upcoming.appendChild(thumb);
       }
     }
 
-    function createPlayer() {
+    function playNext() {
+      if (!playlist.length) return;
+      currentIndex = currentIndex % playlist.length;
+      updateUI();
+      player.loadVideoById(playlist[currentIndex].videoId);
+      currentIndex++;
+    }
+
+    function onYouTubeIframeAPIReady() {
       player = new YT.Player('player', {
-        height: '0',
-        width: '0',
-        playerVars: {
-          autoplay: 1,
-          controls: 0,
-          rel: 0,
-          modestbranding: 1
-        },
+        height: '0', width: '0',
         events: {
-          'onReady': loadPlaylist,
-          'onStateChange': onPlayerStateChange
+          onReady: loadPlaylist,
+          onStateChange: e => {
+            if (e.data === YT.PlayerState.ENDED) playNext();
+          }
         }
       });
     }
 
-    function formatDuration(seconds) {
-      const min = Math.floor(seconds / 60);
-      const sec = seconds % 60;
-      return `${min}:${sec.toString().padStart(2, '0')}`;
-    }
-
-    function updateNowPlaying(track) {
-      document.getElementById('track-title').textContent = track.title || 'Sin título';
-      document.getElementById('track-tags').textContent = track.tags || '';
-      document.getElementById('track-duration').textContent = track.duracion
-        ? formatDuration(track.duracion)
-        : '';
-
-      // Mostrar miniatura (tapa)
-      const coverURL = `https://i.ytimg.com/vi/${track.videoId}/hqdefault.jpg`;
-      document.getElementById('cover').src = coverURL;
-    }
-
-    function parseSheetData(rawText) {
-      const json = JSON.parse(rawText.substring(47).slice(0, -2));
-      const rows = json.table.rows;
-      return rows.map(r => ({
-        videoId: r.c[0]?.v,
-        title: r.c[1]?.v,
-        tags: r.c[2]?.v,
-        duracion: parseInt(r.c[3]?.v)
-      })).filter(r => r.videoId);
-    }
-
     function loadPlaylist() {
       fetch(sheetURL)
-        .then(response => response.text())
-        .then(data => {
-          videoList = parseSheetData(data);
-          shuffleArray(videoList);
-          playNextVideo();
-        })
-        .catch(err => {
-          document.getElementById('track-title').textContent = "Error al cargar la playlist";
-          console.error("Error:", err);
+        .then(r => r.text())
+        .then(t => JSON.parse(t.substring(47).slice(0, -2)))
+        .then(json => {
+          playlist = json.table.rows.map(formatRow).filter(r => r.videoId);
+          shuffle(playlist);
+          playNext();
         });
     }
 
-    function playNextVideo() {
-      if (videoList.length === 0) return;
-      const track = videoList[currentIndex];
-      updateNowPlaying(track);
-      player.loadVideoById(track.videoId);
-      currentIndex = (currentIndex + 1) % videoList.length;
-    }
-
-    function onPlayerStateChange(event) {
-      if (event.data === YT.PlayerState.ENDED) {
-        playNextVideo();
-      }
-    }
-
-    function shuffleArray(array) {
-      for (let i = array.length - 1; i > 0; i--) {
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+        [arr[i], arr[j]] = [arr[j], arr[i]];
       }
     }
   </script>
