@@ -1,0 +1,115 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Jit Jot Radio</title>
+  <style>
+    body {
+      background-color: black;
+      color: white;
+      font-family: monospace;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 3em;
+      margin-bottom: 0.5em;
+      animation: glow 2s infinite alternate;
+    }
+    @keyframes glow {
+      from { text-shadow: 0 0 5px #ff0, 0 0 10px #f0f, 0 0 20px #0ff; }
+      to { text-shadow: 0 0 20px #ff0, 0 0 30px #f0f, 0 0 40px #0ff; }
+    }
+    #player {
+      margin: 20px auto;
+      max-width: 640px;
+    }
+    #title, #tags {
+      margin-top: 10px;
+      font-size: 1.2em;
+    }
+    #history {
+      margin-top: 30px;
+      border-top: 1px solid white;
+      padding-top: 10px;
+      max-width: 640px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .track-item {
+      margin-bottom: 5px;
+      font-size: 0.9em;
+      color: #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h1>Jit Jot Radio</h1>
+  <div id="player"></div>
+  <p id="title">Cargando track...</p>
+  <p id="tags"></p>
+  <div id="history">
+    <h3>Historial reciente</h3>
+    <div id="historyList"></div>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    const sheetId = '1djjlYwEiyuTUVdv7V_3f02h2gLmB5c2D61EMz_3zIYc'; // hoja demo
+    const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+    let playlist = [], player;
+    let history = [];
+
+    function fetchPlaylist() {
+      fetch(sheetUrl)
+        .then(res => res.text())
+        .then(text => {
+          const json = JSON.parse(text.substring(47).slice(0, -2));
+          playlist = json.table.rows.map(r => ({
+            id: r.c[0].v,
+            title: r.c[1].v,
+            tags: r.c[2].v
+          }));
+          playNext();
+        });
+    }
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        height: '360', width: '640', videoId: '',
+        events: {
+          'onReady': playNext,
+          'onStateChange': onPlayerStateChange
+        }
+      });
+    }
+
+    function playNext() {
+      if (playlist.length === 0) return;
+      const next = playlist[Math.floor(Math.random() * playlist.length)];
+      player.loadVideoById(next.id);
+      document.getElementById("title").innerText = next.title;
+      document.getElementById("tags").innerText = `#${next.tags.replace(/,\s*/g, ' #')}`;
+      addToHistory(next);
+    }
+
+    function onPlayerStateChange(event) {
+      if (event.data === YT.PlayerState.ENDED) playNext();
+    }
+
+    function addToHistory(track) {
+      history.unshift(track);
+      if (history.length > 10) history.pop();
+      updateHistoryDisplay();
+    }
+
+    function updateHistoryDisplay() {
+      const container = document.getElementById("historyList");
+      container.innerHTML = history.map(h => `<div class='track-item'>${h.title} <span style='color:gray'>(${h.tags})</span></div>`).join('');
+    }
+
+    fetchPlaylist();
+  </script>
+</body>
+</html>
