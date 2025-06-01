@@ -12,10 +12,9 @@
     padding: 20px;
   }
   #player {
-    width: 1px;
-    height: 1px;
-    position: absolute;
-    left: -1000px; /* ocultar iframe */
+    width: 320px;
+    height: 180px;
+    margin: 0 auto;
   }
   #volume-control {
     margin-top: 30px;
@@ -37,17 +36,15 @@
 </div>
 
 <script>
-  // Lista de videos (videoId, duración en segundos)
   const playlist = [
     { videoId: '3Io_fqiooWY', duration: 206 },
-    { videoId: 'abc123xyz', duration: 113 },
-    // agrega más videos aquí
+    { videoId: 'dQw4w9WgXcQ', duration: 213 },
+    // reemplaza por videos reales y duración real
   ];
 
   let player;
   let currentIndex = 0;
 
-  // Calcula el video y tiempo exacto a reproducir en función de la hora UTC
   function getCurrentVideoIndexAndTime() {
     const now = new Date();
     const utcSeconds = Math.floor(now.getTime() / 1000);
@@ -70,8 +67,8 @@
     currentIndex = current.index;
 
     player = new YT.Player('player', {
-      height: '1',
-      width: '1',
+      height: '180',
+      width: '320',
       videoId: playlist[currentIndex].videoId,
       playerVars: {
         autoplay: 1,
@@ -92,21 +89,19 @@
         },
         onStateChange: (event) => {
           if (event.data === YT.PlayerState.ENDED) {
-            // El loop lo controla YouTube con playlist + loop = 1
+            // YouTube maneja el loop con playlist y loop=1
           }
         }
       }
     });
   }
 
-  // Carga API YouTube
   const tag = document.createElement('script');
   tag.src = "https://www.youtube.com/iframe_api";
   document.body.appendChild(tag);
 
   window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
 
-  // Control de volumen externo
   const volumeSlider = document.getElementById('volume');
   volumeSlider.addEventListener('input', () => {
     if (player && player.setVolume) {
