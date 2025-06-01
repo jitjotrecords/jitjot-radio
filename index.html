@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Jitjot Radio test</title>
+  <title>Jitjot Radio</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body {
@@ -35,10 +35,9 @@
   </div>
 
   <script src="https://www.youtube.com/iframe_api"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Tabletop.js/1.5.4/tabletop.min.js"></script>
 
   <script>
-    const sheetURL = 'https://docs.google.com/spreadsheets/d/1WpCq0LQduIwF5h1sucDr239JbcPbqoqQttXw8_VMHpY/pubhtml';
+    const sheetURL = "https://docs.google.com/spreadsheets/d/1WpCq0LQduIwF5h1sucDr239JbcPbqoqQttXw8_VMHpY/gviz/tq?tqx=out:json";
     let videoList = [];
     let currentIndex = 0;
     let player;
@@ -52,9 +51,18 @@
     function updateNowPlaying(track) {
       document.getElementById('track-title').textContent = track.title || 'Sin título';
       document.getElementById('track-tags').textContent = track.tags || '';
-      document.getElementById('track-duration').textContent = track.duraciónSegundos
-        ? formatDuration(parseInt(track.duraciónSegundos))
-        : '';
+      document.getElementById('track-duration').textContent = track.duracion ? formatDuration(track.duracion) : '';
+    }
+
+    function parseSheetData(rawText) {
+      const json = JSON.parse(rawText.substring(47).slice(0, -2));
+      const rows = json.table.rows;
+      return rows.map(r => ({
+        videoId: r.c[0]?.v,
+        title: r.c[1]?.v,
+        tags: r.c[2]?.v,
+        duracion: parseInt(r.c[3]?.v)
+      })).filter(r => r.videoId);
     }
 
     function onYouTubeIframeAPIReady() {
@@ -69,15 +77,17 @@
     }
 
     function loadPlaylist() {
-      Tabletop.init({
-        key: sheetURL,
-        simpleSheet: true,
-        callback: function(data) {
-          videoList = data;
+      fetch(sheetURL)
+        .then(response => response.text())
+        .then(data => {
+          videoList = parseSheetData(data);
           shuffleArray(videoList);
           playNextVideo();
-        }
-      });
+        })
+        .catch(err => {
+          document.getElementById('track-title').textContent = "Error al cargar la playlist";
+          console.error("Error:", err);
+        });
     }
 
     function playNextVideo() {
