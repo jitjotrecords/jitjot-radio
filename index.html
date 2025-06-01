@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
-<title>Jit Jot Radio - Playlist sincronizada</title>
+<title>Jit Jot Radio - Playlist sincronizada con Historial</title>
 <style>
   body {
     background: #111;
@@ -17,7 +17,7 @@
     margin: 20px auto;
   }
   #volume-control {
-    margin-top: 30px;
+    margin-top: 15px;
   }
   input[type=range] {
     width: 200px;
@@ -25,6 +25,33 @@
   #current-title {
     margin-top: 15px;
     font-weight: bold;
+  }
+  #history {
+    margin-top: 30px;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .history-item {
+    cursor: pointer;
+    width: 100px;
+    color: #ccc;
+    font-size: 12px;
+  }
+  .history-item img {
+    width: 100px;
+    height: 56px;
+    display: block;
+    margin-bottom: 5px;
+    border: 2px solid transparent;
+    transition: border-color 0.3s;
+  }
+  .history-item:hover img {
+    border-color: #f90;
   }
 </style>
 </head>
@@ -40,18 +67,21 @@
   <input type="range" id="volume" min="0" max="100" value="50" />
 </div>
 
+<div id="history"></div>
+
 <script>
-  // Playlist: videoId, duración en segundos y título
+  // Playlist original (sin videos extras)
   const playlist = [
     { videoId: '3Io_fqiooWY', duration: 206, title: 'Video 1 - Jit Jot' },
     { videoId: 'dQw4w9WgXcQ', duration: 213, title: 'Video 2 - Never Gonna Give You Up' },
-    // agrega más videos acá con duración y título reales
+    // Agrega aquí tus videos reales
   ];
 
   let player;
   let currentIndex = 0;
+  const historyMax = 10;
+  let history = [];
 
-  // Calcula posición sincronizada para que todos escuchen "en vivo"
   function getCurrentIndexAndTime() {
     const now = new Date();
     const utcSeconds = Math.floor(now.getTime() / 1000);
@@ -72,69 +102,8 @@
     return { index: 0, time: 0 };
   }
 
-  function loadVideoAtIndex(index, startSeconds) {
-    currentIndex = index;
-    const video = playlist[index];
-    document.getElementById('current-title').textContent = video.title;
-
-    if (player && player.loadVideoById) {
-      player.loadVideoById({
-        videoId: video.videoId,
-        startSeconds: startSeconds
-      });
-    }
-  }
-
-  function onYouTubeIframeAPIReady() {
-    const current = getCurrentIndexAndTime();
-    currentIndex = current.index;
-
-    player = new YT.Player('player', {
-      height: '180',
-      width: '320',
-      videoId: playlist[currentIndex].videoId,
-      playerVars: {
-        autoplay: 1,
-        controls: 0,
-        disablekb: 1,
-        modestbranding: 1,
-        rel: 0,
-        showinfo: 0,
-        iv_load_policy: 3,
-        start: Math.floor(current.time),
-        loop: 0,
-      },
-      events: {
-        onReady: (event) => {
-          event.target.setVolume(50);
-          event.target.playVideo();
-        },
-        onStateChange: (event) => {
-          if (event.data === YT.PlayerState.ENDED) {
-            // Cuando termina un video, pasamos al siguiente
-            let nextIndex = (currentIndex + 1) % playlist.length;
-            loadVideoAtIndex(nextIndex, 0);
-          }
-        }
-      }
-    });
-  }
-
-  // Carga la API de YouTube
-  const tag = document.createElement('script');
-  tag.src = "https://www.youtube.com/iframe_api";
-  document.body.appendChild(tag);
-
-  window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
-
-  // Control de volumen
-  const volumeSlider = document.getElementById('volume');
-  volumeSlider.addEventListener('input', () => {
-    if (player && player.setVolume) {
-      player.setVolume(volumeSlider.value);
-    }
-  });
-</script>
-
-</body>
-</html>
+  function updateHistory(index) {
+    // Si ya está en history, lo sacamos para ponerlo al frente
+    history = history.filter(i => i !== index);
+    history.unshift(index);
+    if (history.length > historyMax) h
