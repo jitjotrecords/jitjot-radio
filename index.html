@@ -1,26 +1,72 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-
-
-
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Jit Jot Radio</title>
-  <link rel="stylesheet" href="style.css" />
-  <script src="https://www.youtube.com/iframe_api"></script>
+  <style>
+    body {
+      background-color: black;
+      color: white;
+      font-family: monospace;
+      text-align: center;
+      padding: 2rem;
+    }
+    iframe {
+      width: 560px;
+      height: 315px;
+      border: none;
+    }
+  </style>
 </head>
 <body>
-  <h1>📻 Jit Jot Radio</h1>
-  <div id="info">Cargando radio...</div>
-  <div id="volumeControl">
-    <label for="volume">🔊 Volumen</label><br />
-    <input type="range" id="volume" min="0" max="1" step="0.01" value="0.8" />
-  </div>
-  <div id="player"></div>
+  <h1>Jit Jot Radio</h1>
+  <h2 id="title">Cargando...</h2>
+  <iframe id="player" allow="autoplay; encrypted-media" allowfullscreen></iframe>
 
-<script src="https://www.youtube.com/iframe_api"></script>
-<script src="script.js"></script>
+  <script>
+    const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS0uilsv3McF9pbIwdO_awWhgL3Kg7n09nbw5YlCM4oIaPXO6MhnS0p6KYrDxdEM_LnvktccPHctDmK/pub?gid=0&single=true&output=csv";
+    let playlist = [];
+    let current = 0;
 
+    function loadCSV(url) {
+      fetch(url)
+        .then(response => response.text())
+        .then(csv => {
+          const lines = csv.split("\n").slice(1); // salta encabezado
+          playlist = lines.map(line => {
+            const [title, url, start, end] = line.split(",");
+            const videoId = url.match(/(?:\?v=|\.be\/)([a-zA-Z0-9_-]{11})/);
+            return {
+              title: title.trim(),
+              videoId: videoId ? videoId[1] : null,
+              start: parseInt(start) || 0,
+              end: parseInt(end) || null
+            };
+          }).filter(item => item.videoId);
+          playCurrent();
+        });
+    }
+
+    function playCurrent() {
+      const track = playlist[current];
+      if (!track) return;
+      document.getElementById("title").textContent = track.title;
+
+      const endParam = track.end ? `&end=${track.end}` : "";
+      const src = `https://www.youtube.com/embed/${track.videoId}?autoplay=1&start=${track.start}${endParam}&controls=0&modestbranding=1&rel=0&playsinline=1`;
+
+      const player = document.getElementById("player");
+      player.src = src;
+
+      const duration = (track.end ? track.end : track.start + 60) - track.start;
+      setTimeout(() => {
+        current = (current + 1) % playlist.length;
+        playCurrent();
+      }, duration * 1000);
+    }
+
+    loadCSV(sheetUrl);
+  </script>
 </body>
 </html>
