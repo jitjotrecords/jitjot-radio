@@ -67,14 +67,32 @@ let currentIndex = 0;
 const historyMax = 10;
 const historyList = [];
 
-// Crear iframe de YouTube
 const playerDiv = document.getElementById('player');
 const nowPlayingDiv = document.getElementById('now-playing');
 const tagsDiv = document.getElementById('tags');
 const historyUl = document.getElementById('history-list');
 
+let player;
+
+// Crea reproductor YouTube usando API
 function createPlayer(videoId) {
-  playerDiv.innerHTML = `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&rel=0" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+  if (player) {
+    player.loadVideoById(videoId);
+  } else {
+    player = new YT.Player('player', {
+      height: '315',
+      width: '560',
+      videoId: videoId,
+      playerVars: {
+        autoplay: 1,
+        controls: 1,
+        rel: 0,
+      },
+      events: {
+        'onStateChange': onPlayerStateChange
+      }
+    });
+  }
 }
 
 function updateNowPlaying(title, tags) {
@@ -105,6 +123,13 @@ function nextTrack() {
   if (currentIndex >= playlist.length) currentIndex = 0;
 }
 
+// Detecta cuando el video termina para avanzar
+function onPlayerStateChange(event) {
+  if (event.data == YT.PlayerState.ENDED) {
+    nextTrack();
+  }
+}
+
 // Parsear CSV sencillo
 function parseCSV(text) {
   const lines = text.trim().split('\n');
@@ -116,19 +141,28 @@ function parseCSV(text) {
   return result;
 }
 
-// Cargar CSV
-fetch(sheetCsvUrl)
-  .then(response => response.text())
-  .then(data => {
-    playlist = parseCSV(data);
-    nextTrack();
-    // Cambiar de canción cada 4 minutos (240000 ms)
-    setInterval(nextTrack, 240000);
-  })
-  .catch(err => {
-    nowPlayingDiv.textContent = 'Error cargando la lista de reproducción.';
-    console.error(err);
-  });
+// Cargar API YouTube y después cargar playlist
+function loadYouTubeAPI() {
+  const tag = document.createElement('script');
+  tag.src = "https://www.youtube.com/iframe_api";
+  document.body.appendChild(tag);
+}
+
+function onYouTubeIframeAPIReady() {
+  fetch(sheetCsvUrl)
+    .then(response => response.text())
+    .then(data => {
+      playlist = parseCSV(data);
+      nextTrack();
+    })
+    .catch(err => {
+      nowPlayingDiv.textContent = 'Error cargando la lista de reproducción.';
+      console.error(err);
+    });
+}
+
+window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+loadYouTubeAPI();
 </script>
 
 </body>
