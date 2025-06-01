@@ -1,72 +1,105 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Jit Jot Radio</title>
+  <meta charset="UTF-8">
+  <title>Jitjot Radio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body {
-      background-color: black;
+      background: black;
       color: white;
-      font-family: monospace;
+      font-family: sans-serif;
       text-align: center;
       padding: 2rem;
     }
-    iframe {
-      width: 560px;
-      height: 315px;
-      border: none;
+    h1 { font-size: 2em; margin-bottom: 1rem; }
+    .now-playing {
+      margin-top: 1.5rem;
+      font-size: 1.2em;
+    }
+    .tags, .duration {
+      color: #aaa;
+      font-size: 0.9em;
     }
   </style>
 </head>
 <body>
-  <h1>Jit Jot Radio</h1>
-  <h2 id="title">Cargando...</h2>
-  <iframe id="player" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+
+  <h1>🎙️ JITJOT RADIO</h1>
+  <div id="player"></div>
+
+  <div class="now-playing">
+    <div id="track-title">Cargando...</div>
+    <div id="track-tags" class="tags"></div>
+    <div id="track-duration" class="duration"></div>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Tabletop.js/1.5.4/tabletop.min.js"></script>
 
   <script>
-    const sheetUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS0uilsv3McF9pbIwdO_awWhgL3Kg7n09nbw5YlCM4oIaPXO6MhnS0p6KYrDxdEM_LnvktccPHctDmK/pub?gid=0&single=true&output=csv";
-    let playlist = [];
-    let current = 0;
+    const sheetURL = 'https://docs.google.com/spreadsheets/d/1WpCq0LQduIwF5h1sucDr239JbcPbqoqQttXw8_VMHpY/pubhtml';
+    let videoList = [];
+    let currentIndex = 0;
+    let player;
 
-    function loadCSV(url) {
-      fetch(url)
-        .then(response => response.text())
-        .then(csv => {
-          const lines = csv.split("\n").slice(1); // salta encabezado
-          playlist = lines.map(line => {
-            const [title, url, start, end] = line.split(",");
-            const videoId = url.match(/(?:\?v=|\.be\/)([a-zA-Z0-9_-]{11})/);
-            return {
-              title: title.trim(),
-              videoId: videoId ? videoId[1] : null,
-              start: parseInt(start) || 0,
-              end: parseInt(end) || null
-            };
-          }).filter(item => item.videoId);
-          playCurrent();
-        });
+    function formatDuration(seconds) {
+      const min = Math.floor(seconds / 60);
+      const sec = seconds % 60;
+      return `${min}:${sec.toString().padStart(2, '0')}`;
     }
 
-    function playCurrent() {
-      const track = playlist[current];
-      if (!track) return;
-      document.getElementById("title").textContent = track.title;
-
-      const endParam = track.end ? `&end=${track.end}` : "";
-      const src = `https://www.youtube.com/embed/${track.videoId}?autoplay=1&start=${track.start}${endParam}&controls=0&modestbranding=1&rel=0&playsinline=1`;
-
-      const player = document.getElementById("player");
-      player.src = src;
-
-      const duration = (track.end ? track.end : track.start + 60) - track.start;
-      setTimeout(() => {
-        current = (current + 1) % playlist.length;
-        playCurrent();
-      }, duration * 1000);
+    function updateNowPlaying(track) {
+      document.getElementById('track-title').textContent = track.title || 'Sin título';
+      document.getElementById('track-tags').textContent = track.tags || '';
+      document.getElementById('track-duration').textContent = track.duraciónSegundos
+        ? formatDuration(parseInt(track.duraciónSegundos))
+        : '';
     }
 
-    loadCSV(sheetUrl);
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        height: '0',
+        width: '0',
+        events: {
+          'onReady': loadPlaylist,
+          'onStateChange': onPlayerStateChange
+        }
+      });
+    }
+
+    function loadPlaylist() {
+      Tabletop.init({
+        key: sheetURL,
+        simpleSheet: true,
+        callback: function(data) {
+          videoList = data;
+          shuffleArray(videoList);
+          playNextVideo();
+        }
+      });
+    }
+
+    function playNextVideo() {
+      if (videoList.length === 0) return;
+      const track = videoList[currentIndex];
+      updateNowPlaying(track);
+      player.loadVideoById(track.videoId);
+      currentIndex = (currentIndex + 1) % videoList.length;
+    }
+
+    function onPlayerStateChange(event) {
+      if (event.data === YT.PlayerState.ENDED) {
+        playNextVideo();
+      }
+    }
+
+    function shuffleArray(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
   </script>
 </body>
 </html>
