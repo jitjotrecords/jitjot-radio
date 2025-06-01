@@ -1,138 +1,42 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jit Jot Radio 24/7</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jit Jot Radio</title>
   <style>
     body {
       margin: 0;
-      background: black;
-      color: white;
+      background-color: #000;
+      color: #fff;
       font-family: monospace;
       text-align: center;
+      padding: 2em 1em;
     }
-    #playerInfo {
-      margin-top: 2em;
+    h1 {
+      font-size: 2em;
+      margin-bottom: 0.5em;
+    }
+    #info {
+      margin: 1em 0;
+      font-size: 1.2em;
     }
     #volumeControl {
       margin-top: 1em;
     }
-    .thumbnail {
-      width: 100px;
-      margin: 5px;
+    #volume {
+      width: 300px;
+    }
+    iframe {
+      display: none;
     }
   </style>
 </head>
 <body>
-  <h1>Jit Jot Radio 24/7</h1>
-  <div id="currentBlock">Bloque actual: ...</div>
-  <div id="playerInfo">Cargando...</div>
+  <h1>📻 Jit Jot Radio</h1>
+  <div id="info">Cargando radio...</div>
   <div id="volumeControl">
-    <label for="volume">🔊 Volumen</label><br>
-    <input type="range" id="volume" min="0" max="100" value="50">
+    <label for="volume">🔊 Volumen</label><br />
+    <input type="range" id="volume" min="0" max="1" step="0.01" value="0.8" />
   </div>
-
-  <script src="https://www.youtube.com/iframe_api"></script>
-
-  <script>
-    const sheetUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS0uilsv3McF9pbIwdO_awWhgL3Kg7n09nbw5YlCM4oIaPXO6MhnS0p6KYrDxdEM_LnvktccPHctDmK/pub?gid=0&single=true&output=csv';
-    const etiquetas = ['punk', 'psicodelia', 'funk', 'experimental', 'folk', 'electrónica'];
-
-    let playlist = [];
-    let filteredList = [];
-    let currentTrackIndex = 0;
-    let player;
-
-    function getCurrentBlockTag() {
-      const date = new Date();
-      const hour = date.getHours();
-      const blockIndex = hour % etiquetas.length;
-      return etiquetas[blockIndex];
-    }
-
-    function loadPlaylist() {
-      fetch(sheetUrl)
-        .then(res => res.text())
-        .then(text => {
-          const lines = text.trim().split('\n').slice(1);
-          playlist = lines.map(line => {
-            const [videoId, title, tags, dur] = line.split(',');
-            return {
-              videoId: videoId.trim(),
-              title: title.trim(),
-              tags: tags.toLowerCase().split(/\s*,\s*/),
-              duration: parseInt(dur.trim()) || 60
-            };
-          });
-          startBlock();
-        });
-    }
-
-    function startBlock() {
-      const tag = getCurrentBlockTag();
-      document.getElementById('currentBlock').textContent = `Bloque actual: ${tag}`;
-      filteredList = playlist.filter(track => track.tags.includes(tag));
-      if (filteredList.length === 0) {
-        document.getElementById('playerInfo').innerText = 'Sin temas para este bloque';
-        return;
-      }
-      currentTrackIndex = 0;
-      createPlayer();
-    }
-
-    function createPlayer() {
-      const div = document.createElement('div');
-      div.id = "ytplayer";
-      document.body.appendChild(div);
-    }
-
-    function onYouTubeIframeAPIReady() {
-      player = new YT.Player('ytplayer', {
-        height: '0',
-        width: '0',
-        events: {
-          'onReady': onPlayerReady,
-          'onStateChange': onPlayerStateChange
-        },
-        playerVars: {
-          autoplay: 1,
-          controls: 0,
-          modestbranding: 1,
-          rel: 0,
-          fs: 0,
-          disablekb: 1,
-          playsinline: 1
-        }
-      });
-    }
-
-    function onPlayerReady() {
-      document.getElementById('volume').addEventListener('input', e => {
-        const vol = parseInt(e.target.value);
-        player.setVolume(vol);
-      });
-      playNext();
-    }
-
-    function onPlayerStateChange(event) {
-      if (event.data === YT.PlayerState.ENDED) {
-        playNext();
-      }
-    }
-
-    function playNext() {
-      if (filteredList.length === 0) return;
-      const track = filteredList[currentTrackIndex];
-      player.loadVideoById(track.videoId);
-      player.setVolume(parseInt(document.getElementById('volume').value));
-
-      document.getElementById('playerInfo').innerHTML = `<p>${track.title}</p>`;
-
-      currentTrackIndex = (currentTrackIndex + 1) % filteredList.length;
-    }
-
-    loadPlaylist();
-  </script>
-</body>
-</html>
+  <div id="player"
