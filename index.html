@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Jit Jot Radio</title>
+<title>Jit Jot Radio - Radio en Vivo</title>
 <style>
   body {
     background: #111;
@@ -28,24 +28,51 @@
   }
   #history {
     max-width: 560px;
-    margin: 0 auto;
+    margin: 20px auto 0;
     text-align: left;
     background: #222;
     padding: 10px;
     border-radius: 6px;
     font-size: 0.9rem;
+    overflow-y: auto;
+    max-height: 250px;
   }
   #history h3 {
     margin-top: 0;
   }
+  #history .block {
+    margin-bottom: 10px;
+    border-bottom: 1px solid #444;
+    padding-bottom: 8px;
+  }
   #history ul {
-    margin: 0; padding-left: 20px;
+    margin: 5px 0 0;
+    padding-left: 20px;
+  }
+  #history li {
+    margin-bottom: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #history li:hover {
+    background: #333;
+  }
+  #history img.thumb {
+    width: 60px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 3px;
+  }
+  #history span.title {
+    flex-grow: 1;
   }
 </style>
 </head>
 <body>
 
-<h1>🎧 Jit Jot Radio</h1>
+<h1>🎧 Jit Jot Radio - Radio en Vivo</h1>
 
 <div id="player"></div>
 
@@ -54,30 +81,46 @@
 
 <div id="history">
   <h3>Historial</h3>
-  <ul id="history-list"></ul>
+  <div id="history-blocks"></div>
 </div>
 
 <script>
-// URL de tu CSV público
 const sheetCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS0uilsv3McF9pbIwdO_awWhgL3Kg7n09nbw5YlCM4oIaPXO6MhnS0p6KYrDxdEM_LnvktccPHctDmK/pub?gid=0&single=true&output=csv';
 
-// Variables globales
 let playlist = [];
-let currentIndex = 0;
-const historyMax = 10;
-const historyList = [];
+let player;
+let historyList = [];
+const maxHistory = 20; // cuántos videos recordar en historial
 
 const playerDiv = document.getElementById('player');
 const nowPlayingDiv = document.getElementById('now-playing');
 const tagsDiv = document.getElementById('tags');
-const historyUl = document.getElementById('history-list');
+const historyBlocksDiv = document.getElementById('history-blocks');
 
-let player;
+let userTriggered = false; // para saber si usuario hizo click en historial y queremos pausar el autoplay del radio en vivo
 
-// Crea reproductor YouTube usando API
-function createPlayer(videoId) {
-  if (player) {
-    player.loadVideoById(videoId);
+// Parse CSV con 4 columnas: videoId,title,tags,durationSeconds
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const result = [];
+  for (let i=1; i<lines.length; i++) {
+    const parts = lines[i].split(',');
+    if(parts.length < 4) continue;
+    const [videoId, title, tags, duration] = parts;
+    result.push({
+      videoId: videoId.trim(),
+      title: title.trim(),
+      tags: tags.trim(),
+      duration: parseInt(duration.trim()) || 240
+    });
+  }
+  return result;
+}
+
+// Crea player o carga video
+function createPlayer(videoId, startSeconds=0) {
+  if(player) {
+    player.loadVideoById({videoId: videoId, startSeconds: startSeconds});
   } else {
     player = new YT.Player('player', {
       height: '315',
@@ -87,6 +130,7 @@ function createPlayer(videoId) {
         autoplay: 1,
         controls: 1,
         rel: 0,
+        start: startSeconds
       },
       events: {
         'onStateChange': onPlayerStateChange
@@ -95,65 +139,118 @@ function createPlayer(videoId) {
   }
 }
 
+// Actualiza textos en pantalla
 function updateNowPlaying(title, tags) {
   nowPlayingDiv.textContent = `Reproduciendo: ${title}`;
   tagsDiv.textContent = `Tags: ${tags}`;
 }
 
-function updateHistory(title) {
-  historyList.unshift(title);
-  if (historyList.length > historyMax) {
-    historyList.pop();
-  }
-  historyUl.innerHTML = '';
-  historyList.forEach(t => {
+// Añade video al historial y actualiza DOM
+function addToHistory(video) {
+  // No duplicados en historial reciente
+  if(historyList.length > 0 && historyList[0].videoId === video.videoId) return;
+  historyList.unshift(video);
+  if(historyList.length > maxHistory) historyList.pop();
+  renderHistory();
+}
+
+// Renderiza historial con miniaturas y click para reproducir
+function renderHistory() {
+  // Para bloques, aquí solo un bloque, podés extender la lógica para dividir en bloques por día, hora, etc.
+  historyBlocksDiv.innerHTML = '';
+  const block = document.createElement('div');
+  block.className = 'block';
+
+  const ul = document.createElement('ul');
+  historyList.forEach((item, idx) => {
     const li = document.createElement('li');
-    li.textContent = t;
-    historyUl.appendChild(li);
+    li.title = `Escuchar "${item.title}" de nuevo`;
+    li.onclick = () => {
+      userTriggered = true;
+      playVideoByIndex(playlist.findIndex(v => v.videoId === item.videoId));
+    };
+
+    const img = document.createElement('img');
+    img.className = 'thumb';
+    img.src = `https://img.youtube.com/vi/${item.videoId}/default.jpg`;
+    img.alt = item.title;
+
+    const span = document.createElement('span');
+    span.className = 'title';
+    span.textContent = item.title;
+
+    li.appendChild(img);
+    li.appendChild(span);
+    ul.appendChild(li);
   });
+
+  block.appendChild(ul);
+  historyBlocksDiv.appendChild(block);
 }
 
-function nextTrack() {
-  if (playlist.length === 0) return;
-  const item = playlist[currentIndex];
-  createPlayer(item.videoId);
-  updateNowPlaying(item.title, item.tags);
-  updateHistory(item.title);
-  currentIndex++;
-  if (currentIndex >= playlist.length) currentIndex = 0;
+// Calcula qué video y en qué segundo debe sonar según tiempo UTC y duración del playlist
+function calculateCurrentVideoAndTime() {
+  const totalDuration = playlist.reduce((sum, v) => sum + v.duration, 0);
+  if(totalDuration === 0) return {index:0, time:0};
+
+  // Segundos desde epoch modulo total duración para loop infinito
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const loopSeconds = nowSeconds % totalDuration;
+
+  // Buscar qué video toca
+  let accumulator = 0;
+  for(let i=0; i < playlist.length; i++) {
+    accumulator += playlist[i].duration;
+    if(loopSeconds < accumulator) {
+      const startInVideo = loopSeconds - (accumulator - playlist[i].duration);
+      return {index: i, time: startInVideo};
+    }
+  }
+
+  // fallback
+  return {index:0, time:0};
 }
 
-// Detecta cuando el video termina para avanzar
+// Reproduce video por índice en playlist y agrega a historial
+function playVideoByIndex(i, startSeconds=0) {
+  if(i < 0 || i >= playlist.length) return;
+  const video = playlist[i];
+  updateNowPlaying(video.title, video.tags);
+  createPlayer(video.videoId, startSeconds);
+  addToHistory(video);
+  currentPlayingIndex = i;
+  currentPlayingStartTime = startSeconds;
+}
+
+// Maneja cambios de estado del reproductor
 function onPlayerStateChange(event) {
-  if (event.data == YT.PlayerState.ENDED) {
-    nextTrack();
+  if(event.data == YT.PlayerState.ENDED) {
+    if(!userTriggered) {
+      // Si no fue click manual, avanzar al siguiente video en radio en vivo
+      let nextIndex = (currentPlayingIndex + 1) % playlist.length;
+      playVideoByIndex(nextIndex, 0);
+    }
   }
 }
 
-// Parsear CSV sencillo
-function parseCSV(text) {
-  const lines = text.trim().split('\n');
-  const result = [];
-  for (let i=1; i<lines.length; i++) {
-    const [videoId, title, tags] = lines[i].split(',');
-    result.push({videoId, title, tags});
-  }
-  return result;
-}
+// Variables globales para estado actual
+let currentPlayingIndex = 0;
+let currentPlayingStartTime = 0;
 
-// Cargar API YouTube y después cargar playlist
-function loadYouTubeAPI() {
-  const tag = document.createElement('script');
-  tag.src = "https://www.youtube.com/iframe_api";
-  document.body.appendChild(tag);
-}
-
-function onYouTubeIframeAPIReady() {
+// Cargar playlist y arrancar radio sincronizada
+function startRadio() {
   fetch(sheetCsvUrl)
-    .then(response => response.text())
-    .then(data => {
-      playlist = parseCSV(data);
-      nextTrack();
+    .then(r => r.text())
+    .then(text => {
+      playlist = parseCSV(text);
+      if(playlist.length === 0) {
+        nowPlayingDiv.textContent = 'La lista de reproducción está vacía.';
+        return;
+      }
+      // Calcular video actual y posición según tiempo real
+      const {index, time} = calculateCurrentVideoAndTime();
+      userTriggered = false;
+      playVideoByIndex(index, time);
     })
     .catch(err => {
       nowPlayingDiv.textContent = 'Error cargando la lista de reproducción.';
@@ -161,9 +258,19 @@ function onYouTubeIframeAPIReady() {
     });
 }
 
-window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
-loadYouTubeAPI();
-</script>
+// Cargar API de YouTube y arrancar radio al estar lista
+function loadYouTubeAPI() {
+  const tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  document.body.appendChild(tag);
+}
 
+window.onYouTubeIframeAPIReady = function() {
+  startRadio();
+};
+
+loadYouTubeAPI();
+
+</script>
 </body>
 </html>
