@@ -47,69 +47,9 @@
       fetch(sheetUrl)
         .then(res => res.text())
         .then(text => {
-          const lines = text.trim().split('\n').slice(1);
+          const lines = text.trim().split('\n').slice(1); // Salta la cabecera
           playlist = lines.map(line => {
-            const [title, videoId, start, end] = line.split(',');
-            return { title, videoId, start: +start, end: +end };
-          });
-          playNext();
-        });
-    }
+            const parts = line.split(',');
+            if (parts.length < 2) return null;
 
-    function playNext() {
-      if (current >= playlist.length) current = 0;
-      const track = playlist[current];
-
-      const start = track.start || 0;
-      const end = track.end || '';
-      const duration = end ? (end - start) * 1000 : 60000;
-
-      const iframe = document.createElement('iframe');
-      iframe.src = `https://www.youtube.com/embed/${track.videoId}?start=${start}&autoplay=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&playsinline=1`;
-      iframe.width = '0';
-      iframe.height = '0';
-      iframe.allow = 'autoplay';
-
-      const player = document.getElementById('player');
-      player.innerHTML = `<p>${track.title}</p>`;
-      player.appendChild(iframe);
-
-      updateHistory(track);
-      updateNext();
-
-      setTimeout(() => {
-        current++;
-        playNext();
-      }, duration);
-    }
-
-    function updateHistory(track) {
-      history.unshift(track);
-      if (history.length > 10) history = history.slice(0, 10);
-
-      const historyDiv = document.getElementById('history');
-      historyDiv.innerHTML = history.map(t => `
-        <div>
-          <a href="https://www.youtube.com/watch?v=${t.videoId}&t=${t.start}s" target="_blank">
-            <img src="https://img.youtube.com/vi/${t.videoId}/default.jpg" class="thumbnail" alt="${t.title}" /><br/>
-            ${t.title}
-          </a>
-        </div>
-      `).join('');
-    }
-
-    function updateNext() {
-      const next = playlist[(current + 1) % playlist.length];
-      const nextDiv = document.getElementById('next');
-      nextDiv.innerHTML = `
-        <a href="https://www.youtube.com/watch?v=${next.videoId}&t=${next.start}s" target="_blank">
-          <img src="https://img.youtube.com/vi/${next.videoId}/default.jpg" class="thumbnail" alt="${next.title}" /><br/>
-          ${next.title}
-        </a>
-      `;
-    }
-
-    loadPlaylist();
-  </script>
-</body>
-</html>
+            const title = parts[0]?.trim();
