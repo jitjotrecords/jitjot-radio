@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8" />
-<title>Jit Jot Radio - Vintage Obscura Style</title>
+<title>Jit Jot Radio - Playlist sincronizada</title>
 <style>
   body {
     background: #111;
@@ -14,13 +14,17 @@
   #player {
     width: 320px;
     height: 180px;
-    margin: 0 auto;
+    margin: 20px auto;
   }
   #volume-control {
     margin-top: 30px;
   }
   input[type=range] {
     width: 200px;
+  }
+  #current-title {
+    margin-top: 15px;
+    font-weight: bold;
   }
 </style>
 </head>
@@ -29,6 +33,7 @@
 <h1>Jit Jot Radio</h1>
 
 <div id="player"></div>
+<div id="current-title">Cargando...</div>
 
 <div id="volume-control">
   <label for="volume">Volumen</label><br />
@@ -36,34 +41,52 @@
 </div>
 
 <script>
+  // Playlist: videoId, duración en segundos y título
   const playlist = [
-    { videoId: '3Io_fqiooWY', duration: 206 },
-    { videoId: 'dQw4w9WgXcQ', duration: 213 },
-    // reemplaza por videos reales y duración real
+    { videoId: '3Io_fqiooWY', duration: 206, title: 'Video 1 - Jit Jot' },
+    { videoId: 'dQw4w9WgXcQ', duration: 213, title: 'Video 2 - Never Gonna Give You Up' },
+    // agrega más videos acá con duración y título reales
   ];
 
   let player;
   let currentIndex = 0;
 
-  function getCurrentVideoIndexAndTime() {
+  // Calcula posición sincronizada para que todos escuchen "en vivo"
+  function getCurrentIndexAndTime() {
     const now = new Date();
     const utcSeconds = Math.floor(now.getTime() / 1000);
 
     const totalDuration = playlist.reduce((acc, v) => acc + v.duration, 0);
-    const position = utcSeconds % totalDuration;
+    const positionInCycle = utcSeconds % totalDuration;
 
-    let sum = 0;
+    let elapsed = 0;
     for (let i = 0; i < playlist.length; i++) {
-      sum += playlist[i].duration;
-      if (position < sum) {
-        return { index: i, time: playlist[i].duration - (sum - position) };
+      elapsed += playlist[i].duration;
+      if (positionInCycle < elapsed) {
+        return {
+          index: i,
+          time: playlist[i].duration - (elapsed - positionInCycle)
+        };
       }
     }
     return { index: 0, time: 0 };
   }
 
+  function loadVideoAtIndex(index, startSeconds) {
+    currentIndex = index;
+    const video = playlist[index];
+    document.getElementById('current-title').textContent = video.title;
+
+    if (player && player.loadVideoById) {
+      player.loadVideoById({
+        videoId: video.videoId,
+        startSeconds: startSeconds
+      });
+    }
+  }
+
   function onYouTubeIframeAPIReady() {
-    const current = getCurrentVideoIndexAndTime();
+    const current = getCurrentIndexAndTime();
     currentIndex = current.index;
 
     player = new YT.Player('player', {
@@ -79,8 +102,7 @@
         showinfo: 0,
         iv_load_policy: 3,
         start: Math.floor(current.time),
-        loop: 1,
-        playlist: playlist.map(v => v.videoId).join(','),
+        loop: 0,
       },
       events: {
         onReady: (event) => {
@@ -89,19 +111,23 @@
         },
         onStateChange: (event) => {
           if (event.data === YT.PlayerState.ENDED) {
-            // YouTube maneja el loop con playlist y loop=1
+            // Cuando termina un video, pasamos al siguiente
+            let nextIndex = (currentIndex + 1) % playlist.length;
+            loadVideoAtIndex(nextIndex, 0);
           }
         }
       }
     });
   }
 
+  // Carga la API de YouTube
   const tag = document.createElement('script');
   tag.src = "https://www.youtube.com/iframe_api";
   document.body.appendChild(tag);
 
   window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
 
+  // Control de volumen
   const volumeSlider = document.getElementById('volume');
   volumeSlider.addEventListener('input', () => {
     if (player && player.setVolume) {
