@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Jitjot Radio</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
@@ -10,13 +10,44 @@
       color: white;
       font-family: sans-serif;
       text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+
+    #start-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: black;
+    }
+
+    #start-button {
+      font-size: 1.5em;
+      padding: 1em 2em;
+      background: white;
+      color: black;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    #main {
+      display: none;
       padding: 2rem;
     }
-    h1 { font-size: 2em; margin-bottom: 1rem; }
+
+    h1 {
+      font-size: 2em;
+      margin-bottom: 1rem;
+    }
+
     .now-playing {
       margin-top: 1.5rem;
       font-size: 1.2em;
     }
+
     .tags, .duration {
       color: #aaa;
       font-size: 0.9em;
@@ -25,13 +56,20 @@
 </head>
 <body>
 
-  <h1>🎙️ JITJOT RADIO</h1>
-  <div id="player"></div>
+  <div id="start-screen">
+    <h2>🎧 Bienvenido a Jitjot Radio</h2>
+    <button id="start-button">Iniciar radio</button>
+  </div>
 
-  <div class="now-playing">
-    <div id="track-title">Cargando...</div>
-    <div id="track-tags" class="tags"></div>
-    <div id="track-duration" class="duration"></div>
+  <div id="main">
+    <h1>JITJOT RADIO</h1>
+    <div id="player"></div>
+
+    <div class="now-playing">
+      <div id="track-title">Cargando...</div>
+      <div id="track-tags" class="tags"></div>
+      <div id="track-duration" class="duration"></div>
+    </div>
   </div>
 
   <script src="https://www.youtube.com/iframe_api"></script>
@@ -41,6 +79,38 @@
     let videoList = [];
     let currentIndex = 0;
     let player;
+
+    document.getElementById("start-button").addEventListener("click", () => {
+      document.getElementById("start-screen").style.display = "none";
+      document.getElementById("main").style.display = "block";
+      startRadio();
+    });
+
+    function startRadio() {
+      if (typeof YT === "undefined" || typeof YT.Player === "undefined") {
+        // Esperar a que YouTube API esté lista
+        window.onYouTubeIframeAPIReady = createPlayer;
+      } else {
+        createPlayer();
+      }
+    }
+
+    function createPlayer() {
+      player = new YT.Player('player', {
+        height: '0',
+        width: '0',
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          rel: 0,
+          modestbranding: 1
+        },
+        events: {
+          'onReady': loadPlaylist,
+          'onStateChange': onPlayerStateChange
+        }
+      });
+    }
 
     function formatDuration(seconds) {
       const min = Math.floor(seconds / 60);
@@ -63,17 +133,6 @@
         tags: r.c[2]?.v,
         duracion: parseInt(r.c[3]?.v)
       })).filter(r => r.videoId);
-    }
-
-    function onYouTubeIframeAPIReady() {
-      player = new YT.Player('player', {
-        height: '0',
-        width: '0',
-        events: {
-          'onReady': loadPlaylist,
-          'onStateChange': onPlayerStateChange
-        }
-      });
     }
 
     function loadPlaylist() {
