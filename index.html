@@ -1,115 +1,135 @@
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Jit Jot Radio</title>
-  <style>
-    body {
-      background-color: black;
-      color: white;
-      font-family: monospace;
-      text-align: center;
-      padding: 20px;
-    }
-    h1 {
-      font-size: 3em;
-      margin-bottom: 0.5em;
-      animation: glow 2s infinite alternate;
-    }
-    @keyframes glow {
-      from { text-shadow: 0 0 5px #ff0, 0 0 10px #f0f, 0 0 20px #0ff; }
-      to { text-shadow: 0 0 20px #ff0, 0 0 30px #f0f, 0 0 40px #0ff; }
-    }
-    #player {
-      margin: 20px auto;
-      max-width: 640px;
-    }
-    #title, #tags {
-      margin-top: 10px;
-      font-size: 1.2em;
-    }
-    #history {
-      margin-top: 30px;
-      border-top: 1px solid white;
-      padding-top: 10px;
-      max-width: 640px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    .track-item {
-      margin-bottom: 5px;
-      font-size: 0.9em;
-      color: #ccc;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Jit Jot Radio</title>
+<style>
+  body {
+    background: #111;
+    color: #eee;
+    font-family: monospace, monospace;
+    text-align: center;
+    margin: 0; padding: 20px;
+  }
+  #player {
+    margin: 20px auto;
+    max-width: 560px;
+    aspect-ratio: 16 / 9;
+  }
+  #now-playing {
+    margin-top: 10px;
+    font-size: 1.1rem;
+  }
+  #tags {
+    margin: 10px 0 20px;
+    font-style: italic;
+    color: #888;
+  }
+  #history {
+    max-width: 560px;
+    margin: 0 auto;
+    text-align: left;
+    background: #222;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+  #history h3 {
+    margin-top: 0;
+  }
+  #history ul {
+    margin: 0; padding-left: 20px;
+  }
+</style>
 </head>
 <body>
-  <h1>Jit Jot Radio</h1>
-  <div id="player"></div>
-  <p id="title">Cargando track...</p>
-  <p id="tags"></p>
-  <div id="history">
-    <h3>Historial reciente</h3>
-    <div id="historyList"></div>
-  </div>
 
-  <script src="https://www.youtube.com/iframe_api"></script>
-  <script>
-    const sheetId = '1djjlYwEiyuTUVdv7V_3f02h2gLmB5c2D61EMz_3zIYc'; // hoja demo
-    const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
-    let playlist = [], player;
-    let history = [];
+<h1>🎧 Jit Jot Radio</h1>
 
-    function fetchPlaylist() {
-      fetch(sheetUrl)
-        .then(res => res.text())
-        .then(text => {
-          const json = JSON.parse(text.substring(47).slice(0, -2));
-          playlist = json.table.rows.map(r => ({
-            id: r.c[0].v,
-            title: r.c[1].v,
-            tags: r.c[2].v
-          }));
-          playNext();
-        });
-    }
+<div id="player"></div>
 
-    function onYouTubeIframeAPIReady() {
-      player = new YT.Player('player', {
-        height: '360', width: '640', videoId: '',
-        events: {
-          'onReady': playNext,
-          'onStateChange': onPlayerStateChange
-        }
-      });
-    }
+<div id="now-playing"></div>
+<div id="tags"></div>
 
-    function playNext() {
-      if (playlist.length === 0) return;
-      const next = playlist[Math.floor(Math.random() * playlist.length)];
-      player.loadVideoById(next.id);
-      document.getElementById("title").innerText = next.title;
-      document.getElementById("tags").innerText = `#${next.tags.replace(/,\s*/g, ' #')}`;
-      addToHistory(next);
-    }
+<div id="history">
+  <h3>Historial</h3>
+  <ul id="history-list"></ul>
+</div>
 
-    function onPlayerStateChange(event) {
-      if (event.data === YT.PlayerState.ENDED) playNext();
-    }
+<script>
+// URL de tu CSV público
+const sheetCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS0uilsv3McF9pbIwdO_awWhgL3Kg7n09nbw5YlCM4oIaPXO6MhnS0p6KYrDxdEM_LnvktccPHctDmK/pub?gid=0&single=true&output=csv';
 
-    function addToHistory(track) {
-      history.unshift(track);
-      if (history.length > 10) history.pop();
-      updateHistoryDisplay();
-    }
+// Variables globales
+let playlist = [];
+let currentIndex = 0;
+const historyMax = 10;
+const historyList = [];
 
-    function updateHistoryDisplay() {
-      const container = document.getElementById("historyList");
-      container.innerHTML = history.map(h => `<div class='track-item'>${h.title} <span style='color:gray'>(${h.tags})</span></div>`).join('');
-    }
+// Crear iframe de YouTube
+const playerDiv = document.getElementById('player');
+const nowPlayingDiv = document.getElementById('now-playing');
+const tagsDiv = document.getElementById('tags');
+const historyUl = document.getElementById('history-list');
 
-    fetchPlaylist();
-  </script>
+function createPlayer(videoId) {
+  playerDiv.innerHTML = `<iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&rel=0" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+}
+
+function updateNowPlaying(title, tags) {
+  nowPlayingDiv.textContent = `Reproduciendo: ${title}`;
+  tagsDiv.textContent = `Tags: ${tags}`;
+}
+
+function updateHistory(title) {
+  historyList.unshift(title);
+  if (historyList.length > historyMax) {
+    historyList.pop();
+  }
+  historyUl.innerHTML = '';
+  historyList.forEach(t => {
+    const li = document.createElement('li');
+    li.textContent = t;
+    historyUl.appendChild(li);
+  });
+}
+
+function nextTrack() {
+  if (playlist.length === 0) return;
+  const item = playlist[currentIndex];
+  createPlayer(item.videoId);
+  updateNowPlaying(item.title, item.tags);
+  updateHistory(item.title);
+  currentIndex++;
+  if (currentIndex >= playlist.length) currentIndex = 0;
+}
+
+// Parsear CSV sencillo
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const result = [];
+  for (let i=1; i<lines.length; i++) {
+    const [videoId, title, tags] = lines[i].split(',');
+    result.push({videoId, title, tags});
+  }
+  return result;
+}
+
+// Cargar CSV
+fetch(sheetCsvUrl)
+  .then(response => response.text())
+  .then(data => {
+    playlist = parseCSV(data);
+    nextTrack();
+    // Cambiar de canción cada 4 minutos (240000 ms)
+    setInterval(nextTrack, 240000);
+  })
+  .catch(err => {
+    nowPlayingDiv.textContent = 'Error cargando la lista de reproducción.';
+    console.error(err);
+  });
+</script>
+
 </body>
 </html>
