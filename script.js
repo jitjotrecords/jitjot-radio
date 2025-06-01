@@ -1,14 +1,10 @@
-
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vS0uilsv3McF9pbIwdO_awWhgL3Kg7n09nbw5YlCM4oIaPXO6MhnS0p6KYrDxdEM_LnvktccPHctDmK/pub?gid=0&single=true&output=csv';
 
-let tracks = [];
-let currentTag = "";
-let currentTrack = null;
 let player = null;
 
-function getCurrentTag(tags) {
+function getCurrentUtcHourTag() {
   const utcHour = new Date().getUTCHours();
-  return tags[utcHour % tags.length];
+  return String(utcHour); // Los tags deben ser '0', '1', ..., '23'
 }
 
 function loadCSV(url) {
@@ -16,13 +12,13 @@ function loadCSV(url) {
     .then(res => res.text())
     .then(text => {
       const lines = text.trim().split('\n');
-      const rows = lines.slice(1);
+      const rows = lines.slice(1); // skip header
       return rows.map(row => {
         const [videoId, title, tags, dur] = row.split(',');
         return {
           videoId: videoId.trim(),
           title: title.trim(),
-          tags: tags.toLowerCase().split(/[,;]/).map(t => t.trim()),
+          tags: tags.split(/[,;]/).map(t => t.trim()),
           duration: parseInt(dur.trim())
         };
       });
@@ -46,15 +42,12 @@ function getTrackForCurrentTime(tag, trackList) {
     total += track.duration;
   }
 
-  return { ...tagTracks[0], start: 0 };
+  return { ...tagTracks[0], start: 0 }; // Si terminó el bloque, vuelve al primero
 }
 
-function playTrack(track) {
+function playVideo(track) {
   if (player) {
-    player.loadVideoById({
-      videoId: track.videoId,
-      startSeconds: track.start
-    });
+    player.loadVideoById({ videoId: track.videoId, startSeconds: track.start });
   } else {
     player = new YT.Player('player', {
       height: '0',
@@ -62,11 +55,10 @@ function playTrack(track) {
       videoId: track.videoId,
       playerVars: {
         autoplay: 1,
+        start: track.start,
         controls: 0,
         rel: 0,
-        modestbranding: 1,
-        start: track.start,
-        mute: 1
+        modestbranding: 1
       },
       events: {
         onReady: () => {
@@ -76,7 +68,7 @@ function playTrack(track) {
     });
   }
 
-  document.getElementById('info').innerText = `🎶 ${track.title} [${currentTag}]`;
+  document.getElementById('info').innerText = `🎶 ${track.title} [UTC ${getCurrentUtcHourTag()}]`;
 }
 
 function setVolume(value) {
@@ -90,28 +82,13 @@ document.getElementById('volume').addEventListener('input', (e) => {
 });
 
 function onYouTubeIframeAPIReady() {
-  // Se llama automáticamente cuando la API está lista
-}
-
-loadCSV(SHEET_URL).then(allTracks => {
-  tracks = allTracks;
-  const uniqueTags = [...new Set(tracks.flatMap(t => t.tags))];
-  currentTag = getCurrentTag(uniqueTags);
-  currentTrack = getTrackForCurrentTime(currentTag, tracks);
-  if (currentTrack) {
-    playTrack(currentTrack);
-  } else {
-    document.getElementById('info').innerText = 'No hay música disponible para esta hora 😢';
-  }
-
-  setInterval(() => {
-    const newTag = getCurrentTag(uniqueTags);
-    if (newTag !== currentTag) {
-      currentTag = newTag;
-      currentTrack = getTrackForCurrentTime(currentTag, tracks);
-      if (currentTrack) {
-        playTrack(currentTrack);
-      }
+  loadCSV(SHEET_URL).then(tracks => {
+    const tag = getCurrentUtcHourTag();
+    const track = getTrackForCurrentTime(tag, tracks);
+    if (track) {
+      playVideo(track);
+    } else {
+      document.getElementById('info').innerText = '🎧 No hay música para esta hora.';
     }
-  }, 60 * 1000);
-});
+  });
+}
