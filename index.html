@@ -1,16 +1,12 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Jit Jot Radio</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
+<head><meta charset="UTF-8"><title>Test Audio</title></head>
 <body>
-  <h1>🎶 Jit Jot Radio 24/7</h1>
-  <div id="track">Cargando...</div>
-  <audio id="player" controls autoplay></audio>
-  
-  <script src="script.js"></script>
+  <audio id="player" controls></audio>
+  <script>
+    const player = document.getElementById('player');
+    player.src = "https://drive.google.com/uc?export=download&id=15WqzL-WdY1Ckr2zONEq9CfvXsegVJNeM";
+    player.play().catch(console.warn);
+  </script>
 </body>
 </html>
