@@ -1,24 +1,18 @@
-// Lista de tracks de prueba con metadatos manuales
-const tracks = [
-  {
-    title: "Camino",
-    artist: "Maia Basso",
-    duration: 200, // duracion en segundos
-    url: "https://drive.google.com/uc?export=download&id=15WqzL-WdY1Ckr2zONEq9CfvXsegVJNeM
-"
-  },
-  {
-    title: "Ramas",
-    artist: "Maia Basso",
-    duration: 180,
-    url: "https://drive.google.com/uc?export=download&id=TU_ID_DE_RAMAS"
-  }
-];
-
 const player = document.getElementById("player");
 const trackInfo = document.getElementById("track");
 
+let tracks = [];
+
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
 function syncTrack() {
+  if (tracks.length === 0) return;
+
   const now = Date.now() / 1000; // segundos desde epoch
   const total = tracks.reduce((sum, t) => sum + t.duration, 0);
   let pos = now % total;
@@ -34,6 +28,15 @@ function syncTrack() {
   player.play().catch(console.warn);
 }
 
-// sincroniza cada 15 seg
-syncTrack();
-setInterval(syncTrack, 15000);
+fetch('jitjot_tracks.json')
+  .then(response => response.json())
+  .then(data => {
+    tracks = data;
+    shuffleArray(tracks); // shuffle inicial opcional
+    syncTrack();
+    setInterval(syncTrack, 15000);
+  })
+  .catch(err => {
+    console.error('Error cargando tracks:', err);
+    trackInfo.textContent = "Error cargando tracks";
+  });
