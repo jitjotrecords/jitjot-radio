@@ -2,62 +2,16 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Jit Jot Radio – Mini Test</title>
+  <title>Jit Jot Radio – Test Operativo</title>
   <style>
     body { background: #000; color: #fff; font-family: monospace; text-align: center; padding: 2rem; }
-    #info { margin-top: 2rem; }
+    #track { margin-top: 2rem; font-size: 1.2rem; }
   </style>
 </head>
 <body>
   <h1>Jit Jot Radio – Mini Test</h1>
-  <div id="info">Cargando...</div>
+  <div id="track">Cargando...</div>
   <audio id="player" autoplay></audio>
-
-  <script>
-    const tracks = [
-      {
-        "title": "Track 1",
-        "artist": "Artista A",
-        "url": "https://drive.google.com/uc?export=download&id=TU_ID1"
-      },
-      {
-        "title": "Track 2",
-        "artist": "Artista B",
-        "url": "https://drive.google.com/uc?export=download&id=TU_ID2"
-      }
-    ];
-
-    const player = document.getElementById('player');
-    const info = document.getElementById('info');
-
-    function sincronizar() {
-      const now = Date.now();
-      const totalDuration = tracks.reduce((sum, t) => sum + t.duration, 0);
-      let pos = now % totalDuration;
-      let idx = 0;
-
-      while (pos > tracks[idx].duration) {
-        pos -= tracks[idx].duration;
-        idx = (idx + 1) % tracks.length;
-      }
-
-      player.src = tracks[idx].url;
-      player.currentTime = pos;
-      info.textContent = `${tracks[idx].artist} – ${tracks[idx].title}`;
-      player.play().catch(console.error);
-    }
-
-    async function init() {
-      for (let t of tracks) {
-        const resp = await fetch(t.url, { method: 'HEAD' });
-        const dur = resp.headers.get('content-length');
-        t.duration = dur ? parseInt(dur, 10) / (128 * 1024) * 1.0 : 180;
-      }
-      sincronizar();
-      setInterval(sincronizar, 30000);
-    }
-
-    init();
-  </script>
+  <script src="script.js"></script>
 </body>
 </html>
