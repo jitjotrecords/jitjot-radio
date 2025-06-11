@@ -2,64 +2,15 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Radio Jit Jot - Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jit Jot Radio</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h1>🎵 Radio Jit Jot - Demo Shuffle 🎵</h1>
+  <h1>🎶 Jit Jot Radio 24/7</h1>
+  <div id="track">Cargando...</div>
   <audio id="player" controls autoplay></audio>
-  <div id="info"></div>
-
-  <script>
-    // Función para transformar ID de Google Drive en link directo de descarga
-    function driveToDirectLink(id) {
-      return `https://drive.google.com/uc?export=download&id=${id}`;
-    }
-
-    // Función para mezclar (shuffle) el array
-    function shuffle(array) {
-      for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-      }
-      return array;
-    }
-
-    const player = document.getElementById('player');
-    const info = document.getElementById('info');
-    let playlist = [];
-    let current = 0;
-
-    // Cargar JSON externo con lista de tracks
-    fetch('jitjot_tracks.json')
-      .then(response => response.json())
-      .then(data => {
-        playlist = shuffle(data);
-        if (playlist.length > 0) {
-          playTrack(0);
-        } else {
-          info.textContent = "No hay tracks para reproducir.";
-        }
-      })
-      .catch(error => {
-        info.textContent = "Error cargando la lista de reproducción.";
-        console.error('Error:', error);
-      });
-
-    function playTrack(index) {
-      if (index >= playlist.length) {
-        current = 0; // Loop infinito
-      } else {
-        current = index;
-      }
-      const track = playlist[current];
-      player.src = driveToDirectLink(track.id);
-      info.textContent = `🎧 Reproduciendo: ${track.title}`;
-      player.play();
-    }
-
-    player.addEventListener('ended', () => {
-      playTrack(current + 1);
-    });
-  </script>
+  
+  <script src="script.js"></script>
 </body>
 </html>
